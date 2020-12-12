@@ -1,0 +1,575 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Importing & Cleaning Data 
+
+```{r warning=FALSE, warning=FALSE}
+library(baseballr)
+library(tidyverse)
+```
+
+
+
+
+```{r warning=FALSE, message=FALSE}
+# all pitchers who pitched at least 10 innings for the Rays in 2020
+
+Snell2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 605483)
+Glasnow2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 607192) 
+Yarbrough2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 642232)
+Morton2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 450203)
+Fleming2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 676596)
+Fairbanks2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 664126)
+Thompson2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 657044)
+Slegers2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 642083)
+Curtiss2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 595928)
+Loup2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 571901)
+Castillo2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 650895)
+Beeks2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 656222)
+Anderson2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 623433)
+Chirinos2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 630023)
+Drake2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 543118)
+Richards2020 <- scrape_statcast_savant_pitcher_all(start_date="2020-07-21", end_date="2020-09-27", playerid = 670950)
+
+
+TB2020 <- rbind(Snell2020, Glasnow2020, Yarbrough2020, Morton2020, Fleming2020, Fairbanks2020,Thompson2020,Slegers2020,Curtiss2020,Loup2020,Castillo2020,Beeks2020,Anderson2020,Chirinos2020,Drake2020,Richards2020)
+```
+
+```{r}
+TB2020 <- TB2020 %>%
+  dplyr::select(-batter, -pitcher,-spin_dir,-spin_rate_deprecated,-break_angle_deprecated,-break_length_deprecated)
+
+TB2020 <- TB2020 %>%
+  dplyr::select(-game_type,-sz_top, -sz_bot,-game_pk,-pitcher_1, -fielder_2_1, -fielder_3, -fielder_4, -fielder_5, -fielder_6, -fielder_7, -fielder_8, -fielder_9)
+
+TB2020 <- TB2020 %>%
+  dplyr::select(-tfs_deprecated, -tfs_zulu_deprecated)
+
+TB2020 <- TB2020 %>%
+  dplyr::select(-sv_id, -umpire,)
+
+TB2020 <- TB2020 %>%
+  dplyr::select(-game_year,-woba_value, -woba_denom,-babip_value,-iso_value, -pitch_number,-at_bat_number)
+
+
+# https://baseballsavant.mlb.com/csv-docs#estimated_woba_using_speedangle - docs with descriptors of each variable
+
+str(TB2020)
+
+```
+
+```{r warning=FALSE, message=FALSE}
+for (i in 1:dim(TB2020)[1]) {
+  if (TB2020$home_team[i] == "TB") {
+    TB2020$opponent[i] = TB2020$away_team[i]
+    TB2020$location[i] = "home"
+  } else {
+    TB2020$opponent[i] = TB2020$home_team[i]
+    TB2020$location[i] = "away"
+  }
+}
+
+for (i in 1:dim(TB2020)[1]) {
+  if (is.na(TB2020$on_1b[i]) & is.na(TB2020$on_2b[i]) & is.na(TB2020$on_3b)) {
+    TB2020$bases_empty[i] = 1
+  } else {
+    TB2020$bases_empty[i] = 0
+  }
+  
+  if (!is.na(TB2020$on_2b[i]) || !is.na(TB2020$on_3b[i])) {
+    TB2020$scoring_position[i] = 1
+  } else {
+    TB2020$scoring_position[i] = 0
+  }
+}
+# create opponent variable
+# create home/away variable
+# make on base variable
+```
+
+```{r}
+TB2020$score_margin = TB2020$fld_score - TB2020$bat_score
+
+
+TB2020 <- TB2020 %>%
+  dplyr::select(-pitch_type,-home_team, -away_team,-on_3b, -on_2b, -on_1b,-inning_topbot, -home_score,     -away_score, -bat_score, -fld_score, -post_away_score, -post_home_score, -post_bat_score, -post_fld_score)
+
+
+for (i in 1:dim(TB2020)[1]) {
+  if (TB2020$hit_location[i] == "null") {
+    TB2020$hit_location[i] = NA
+  }
+  if (TB2020$bb_type[i] == "null") {
+    TB2020$bb_type[i] = NA
+  }
+  if (TB2020$estimated_ba_using_speedangle[i] == "null") {
+    TB2020$estimated_ba_using_speedangle[i] = NA
+  }
+  if (TB2020$estimated_woba_using_speedangle[i] == "null") {
+    TB2020$estimated_woba_using_speedangle[i] = NA
+  }
+}
+```
+
+```{r}
+TB2020$player_name <- as.factor(TB2020$player_name)
+TB2020$stand <- as.factor(TB2020$stand)
+TB2020$p_throws <- as.factor(TB2020$p_throws)
+TB2020$type <- as.factor(TB2020$type)
+TB2020$hit_location <- as.numeric(TB2020$hit_location)
+TB2020$bb_type <- as.factor(TB2020$bb_type)
+TB2020$estimated_ba_using_speedangle <- as.numeric(TB2020$estimated_ba_using_speedangle)
+TB2020$estimated_woba_using_speedangle <- as.numeric(TB2020$estimated_woba_using_speedangle)
+TB2020$launch_speed_angle <- as.factor(TB2020$launch_speed_angle)
+TB2020$pitch_name <- as.factor(TB2020$pitch_name)
+TB2020$if_fielding_alignment <- as.factor(TB2020$if_fielding_alignment)
+TB2020$of_fielding_alignment <- as.factor(TB2020$of_fielding_alignment)
+TB2020$opponent <- as.factor(TB2020$opponent)
+TB2020$location <- as.factor(TB2020$location)
+```
+
+
+```{r warning=FALSE}
+for (i in 1:dim(TB2020)[1]) {
+  if (TB2020$events[i] == "null") {
+    TB2020$events[i] = NA
+  }
+}
+
+TB2020$events <- as.factor(TB2020$events)
+TB2020$description <- as.factor(TB2020$description)
+
+unique(TB2020$events)
+```
+
+```{r}
+# remove pitch location outliers
+TB2020 <- TB2020 %>%
+  filter(plate_x < 3 & plate_x > -3 & plate_z < 6 & plate_z > -2.4)
+
+head(TB2020)
+```
+
+# Visualizing the Data
+
+
+```{r}
+library(ggplot2)
+
+ggplot(TB2020, mapping = aes(x=release_spin_rate, y=release_speed,color=pitch_name)) +
+  geom_point() +
+  ggtitle("Pitch Speed v. Spin Rate By Pitch Type in All 2020 Rays Pitches")
+  
+```
+
+```{r}
+TB2020$type <- factor(TB2020$type, levels=c("S", "B", "X"))
+
+ggplot(TB2020, mapping = aes(x=release_spin_rate, y=release_speed,color=type)) +
+  geom_point() +
+  ggtitle("Pitch Speed v. Spin Rate By Pitch Outcome in All 2020 Rays Pitches")
+```
+
+```{r}
+
+ggplot(TB2020, mapping=aes(x=plate_x, y=plate_z, color=type)) +
+  geom_point() +
+  ggtitle("Pitch Location by Pitch Outcome from Catcher's Perspective")
+```
+
+```{r}
+ggplot(TB2020, mapping=aes(x=plate_x, y=plate_z, color=pitch_name)) +
+  geom_point() +
+  ggtitle("Pitch Location by Pitch Type from Catcher's Perspective")
+```
+
+
+# Logistic Regression on whether or not a ball is put into play
+
+```{r}
+summary(TB2020$type)
+
+TB2020$fielder_2 <- factor(TB2020$fielder_2)
+#summary(TB2020$in_play)
+```
+
+```{r}
+# want to determine what factors are important in determining whether or not a ball is put into play, then can try out more advanced methods of predicting across 3+ classes
+
+# creating factor variable indicating whether or not a ball is put into play
+TB2020$in_play = NA
+for (i in 1:dim(TB2020)[1]) {
+  if (TB2020$type[i] == "X") {
+    TB2020$in_play[i] = "1"
+  } else {
+    TB2020$in_play[i] = "0"
+  }
+}
+TB2020$in_play = as.factor(TB2020$in_play)
+
+
+
+# using cross validation - split into training and test data
+
+set.seed(123)
+train <- sample.int(7622, size=3811)
+
+TB2020.train <- TB2020[train,]
+TB2020.test <- TB2020[-train,]
+```
+
+```{r}
+# select the variables that may be potentially good predictors of in_play
+
+TB2020.inplay.train <- TB2020.train %>%
+  dplyr::select(in_play, release_speed, release_pos_x, release_pos_z, player_name,zone, stand, p_throws, balls, strikes, outs_when_up, inning, fielder_2, release_spin_rate, release_extension, pitch_name, opponent, location, bases_empty, scoring_position, score_margin)
+
+
+TB2020.inplay.test <- TB2020.test %>%
+  dplyr::select(in_play, release_speed, release_pos_x, release_pos_z, player_name,zone, stand, p_throws, balls, strikes, outs_when_up, inning, fielder_2, release_spin_rate, release_extension, pitch_name, opponent, location, bases_empty, scoring_position, score_margin)
+```
+
+```{r}
+# performing stepwise logistic regression to see which predictors should be included in the final model 
+TB2020.inplay.train <- na.omit(TB2020.inplay.train)
+TB2020.inplay.test <- na.omit(TB2020.inplay.test)
+
+library(MASS)
+inplaymodel <- glm(in_play ~.+release_spin_rate*pitch_name+release_speed*pitch_name, data = TB2020.inplay.train, family = binomial) %>%
+  stepAIC(trace = FALSE)
+# Summarize the final selected model
+summary(inplaymodel)
+```
+
+```{r}
+probabilities <- inplaymodel %>% predict(TB2020.inplay.test, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, "1", "0")
+# Model accuracy
+table(predicted.classes, TB2020.inplay.test$in_play)
+mean(predicted.classes==TB2020.inplay.test$in_play)
+```
+
+# LDA on whether or not a ball is put into play 
+
+```{r}
+inplaylda <- lda(in_play~release_pos_z+zone+balls+strikes+pitch_name, data=TB2020.inplay.train)
+
+ldapredict <- predict(inplaylda, TB2020.inplay.test)
+
+table(ldapredict$class, TB2020.inplay.test$in_play)
+
+mean(ldapredict$class == TB2020.inplay.test$in_play)
+```
+
+```{r}
+# trying with different set of predictors 
+
+inplaylda <- lda(in_play~release_pos_z+zone+balls+strikes+release_speed + release_spin_rate + stand, data=TB2020.inplay.train)
+ldapredict <- predict(inplaylda, TB2020.inplay.test)
+inplaylda
+table(ldapredict$class, TB2020.inplay.test$in_play)
+
+mean(ldapredict$class == TB2020.inplay.test$in_play)
+
+# models seem to consistently predict most pitches as being not in play
+```
+
+# Trying tree methods to predict whether or not a ball is put into play
+
+```{r}
+library(randomForest)
+
+rf <- randomForest(
+  in_play ~ .,
+  data=TB2020.inplay.train
+)
+
+
+rfpred = predict(rf, TB2020.inplay.test)
+
+table(rfpred, TB2020.inplay.test$in_play)
+
+mean(rfpred == TB2020.inplay.test$in_play)
+```
+
+also tried doing random forest with different subsets of predictors, but could not find one that increased correct classification rate
+
+
+
+# P2
+
+# looking at only the balls that are put into play to see which factors are important in determining whether a hit occurs or not 
+
+```{r}
+# 1298 pitches were put into play against Rays Pitching in 2020
+TB2020play <- TB2020 %>%
+  filter(type == "X")
+
+#str(TB2020play)
+
+#summary(TB2020play$events)
+
+# creating indicator variable to indicate whether or not a given ball in play resulted in a hit
+
+TB2020play$hit = NA
+for (i in 1:dim(TB2020play)[1]) {
+  if (TB2020play$events[i] == "double" || TB2020play$events[i] == "single" || TB2020play$events[i] == "triple" || TB2020play$events[i] == "home_run") {
+    TB2020play$hit[i] = 1
+  } else {
+    TB2020play$hit[i] = 0
+  }
+}
+
+TB2020play$hit <- factor(TB2020play$hit)
+
+summary(TB2020play$hit)
+```
+
+```{r}
+# create test and train for in play dataset
+set.seed(123)
+train <- sample.int(1298, size=649)
+TB2020play.train <- TB2020play[train,]
+TB2020play.test <- TB2020play[-train,]
+# select relevant variables for predicting hit
+
+str(TB2020play.train)
+
+TB2020play.test.1 <- TB2020play.test %>%
+  dplyr::select(release_speed, release_pos_x, release_pos_z, player_name, zone, stand, p_throws, balls, strikes, outs_when_up, inning, release_spin_rate, release_extension, pitch_name, if_fielding_alignment, of_fielding_alignment,opponent, location, bases_empty, scoring_position, score_margin, hit)
+
+TB2020play.train.1 <- TB2020play.train %>%
+  dplyr::select(release_speed, release_pos_x, release_pos_z, player_name, zone, stand, p_throws, balls, strikes, outs_when_up, inning, release_spin_rate, release_extension, pitch_name, if_fielding_alignment, of_fielding_alignment,opponent, location, bases_empty, scoring_position, score_margin, hit)
+```
+
+# Stepwise Logistic Regression
+
+```{r}
+# performing stepwise logistic regression 
+TB2020play.train.1 <- na.omit(TB2020play.train.1)
+TB2020play.test.1 <- na.omit(TB2020play.test.1)
+
+library(MASS)
+hitmodel <- glm(hit~.+balls*strikes+pitch_name*release_speed+release_spin_rate*pitch_name+stand*p_throws, data = TB2020play.train.1, family = binomial) %>%
+  stepAIC(trace = FALSE)
+# Summarize the final selected model
+summary(hitmodel)
+```
+```{r}
+probabilities <- hitmodel %>% predict(TB2020play.test.1, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, "1", "0")
+# Model accuracy
+
+table(predicted.classes, TB2020play.test.1$hit)
+mean(predicted.classes==TB2020play.test.1$hit)
+
+# model does not predict a single pitch to have a hit probability above 0.5
+
+# will lowering the threshold to predict as a hit decrease the missclassification rate?
+
+predicted.classes <- ifelse(probabilities > 0.45, "1", "0")
+# Model accuracy
+
+table(predicted.classes, TB2020play.test.1$hit)
+mean(predicted.classes==TB2020play.test.1$hit)
+
+
+predicted.classes <- ifelse(probabilities > 0.4, "1", "0")
+# Model accuracy
+
+table(predicted.classes, TB2020play.test.1$hit)
+mean(predicted.classes==TB2020play.test.1$hit)
+
+
+
+predicted.classes <- ifelse(probabilities > 0.35, "1", "0")
+# Model accuracy
+
+table(predicted.classes, TB2020play.test.1$hit)
+mean(predicted.classes==TB2020play.test.1$hit)
+
+# not evident that it does
+```
+
+
+# LDA
+```{r}
+hitlda <- lda(hit~pitch_name+release_speed+release_spin_rate+outs_when_up+release_extension+balls+strikes, data=TB2020play.train.1)
+hitlda
+ldapredicthit <- predict(hitlda, TB2020play.test.1)
+table(ldapredicthit$class, TB2020play.test.1$hit)
+mean(ldapredicthit$class == TB2020play.test.1$hit)
+```
+
+
+# Random Forests
+
+```{r}
+library(randomForest)
+
+rf.hit <- randomForest(
+  hit ~ .,
+  data=TB2020play.train.1
+)
+rf.hit
+
+rfpred.hit = predict(rf.hit, TB2020play.test.1)
+
+table(rfpred.hit, TB2020play.test.1$hit)
+
+mean(rfpred.hit == TB2020play.test.1$hit)
+```
+
+even after trying a variety of methods, cannot find any classification models that improve on the model other than just predicting every pitch to be a non-hit
+
+# can be a lot of variability in what results in a hit, another goal is to minimize exit velocity, which will decrease hits over time
+
+predicting whether or not a given ball in play results in a hit based on pitch-level and game-situation did not prove to be very successful since what is defined as a hit can range from a weak infield single to a 450 foot home run. 
+
+plot below shows that hits tend to have slightly higher exit velocities than non-hits
+
+but also if you induce weak contact, that means you're less likely to give up damaging hits that are more likely to produce runs 
+  i.e the hits that occur with lower exit velocities are much more likely to be singles than extra base hits
+
+```{r}
+TB2020play$outcome = factor(TB2020play$events)
+for (i in 1:dim(TB2020play)[1]) {
+  if (TB2020play$events[i] != "double" && TB2020play$events[i] != "single" && TB2020play$events[i] != "triple" && TB2020play$events[i] != "home_run") {
+    TB2020play$outcome[i] = "non-hit"
+  }
+}
+
+
+ggplot(TB2020play) +
+  geom_boxplot(mapping=aes(x=hit,y=launch_speed, col=outcome)) +
+  ylim(30,120) +
+  ggtitle("Boxplot of Exit Velocities Between Hits and Non-Hits") +
+  scale_color_discrete(name = "Ball in Play Outcome", labels = c("Double", "Home Run", "Single", "Triple", "Non-Hit"))
+
+```
+
+```{r}
+# creating train and test dataset with all possible predictors for hit, but with exit velocity instead of hit
+TB2020play.test.2 <- TB2020play.test %>%
+  dplyr::select(release_speed, release_pos_x, release_pos_z, player_name, zone, stand, p_throws, balls, strikes, outs_when_up, inning, release_spin_rate, release_extension, pitch_name, if_fielding_alignment, of_fielding_alignment,opponent, location, bases_empty, scoring_position, score_margin, launch_speed)
+
+TB2020play.train.2 <- TB2020play.train %>%
+  dplyr::select(release_speed, release_pos_x, release_pos_z, player_name, zone, stand, p_throws, balls, strikes, outs_when_up, inning, release_spin_rate, release_extension, pitch_name, if_fielding_alignment, of_fielding_alignment,opponent, location, bases_empty, scoring_position, score_margin, launch_speed)
+```
+
+# Stepwise Regression on Exit Velocity
+
+```{r}
+TB2020play.train.2 <- na.omit(TB2020play.train.2)
+TB2020play.test.2 <- na.omit(TB2020play.test.2)
+
+# removing any outlier exit velocities
+# many very slow exit velocities occurred in model that were likely from bunts and check swings that should not be included to fit the model
+
+TB2020play.train.2 <- TB2020play.train.2 %>%
+  filter(launch_speed > 45)
+
+TB2020play.test.2 <- TB2020play.test.2 %>%
+  filter(launch_speed > 45)
+
+library(MASS)
+exitvelomodel <- glm(launch_speed~.+balls*strikes+pitch_name*release_speed+release_spin_rate*pitch_name+stand*p_throws-if_fielding_alignment-of_fielding_alignment, data = TB2020play.train.2, family = gaussian) %>%
+  stepAIC(trace = FALSE)
+# Summarize the final selected model
+summary(exitvelomodel)
+```
+
+```{r}
+exitvelopredict <- predict(exitvelomodel, TB2020play.test.2)
+
+mean((exitvelopredict - TB2020play.test.2$launch_speed)^2)
+```
+
+# Regularization cv.glmnet methods to predict exit velocity
+```{r}
+library(modelr)
+TB2020play.2 <- rbind(TB2020play.test.2, TB2020play.train.2)
+
+y = TB2020play.2$launch_speed
+X=model_matrix(TB2020play.2,launch_speed~.+release_speed*release_spin_rate+stand*p_throws+zone*release_speed)[,-22]
+var.names=names(X)
+dim(X)
+```
+
+
+
+```{r}
+library(glmnet)
+set.seed(216)
+cvmod.0=cv.glmnet(y=y,x=as.matrix(X),type.measure = "mse",alpha=0)
+set.seed(216)
+cvmod.25=cv.glmnet(y=y,x=as.matrix(X), type.measure = "mse",alpha=0.25)
+set.seed(216)
+cvmod.5=cv.glmnet(y=y,x=as.matrix(X), type.measure = "mse",alpha=0.5)
+set.seed(216)
+cvmod.75=cv.glmnet(y=y,x=as.matrix(X), type.measure = "mse",alpha=0.75)
+set.seed(216)
+cvmod.1=cv.glmnet(y=y,x=as.matrix(X), type.measure = "mse",alpha=1)
+
+CV.0.ERROR=cvmod.0$cvm[which(cvmod.0$lambda==cvmod.0$lambda.1se)]
+CV.25.ERROR=cvmod.25$cvm[which(cvmod.25$lambda==cvmod.25$lambda.1se)]
+CV.5.ERROR=cvmod.5$cvm[which(cvmod.5$lambda==cvmod.5$lambda.1se)]
+CV.75.ERROR=cvmod.75$cvm[which(cvmod.75$lambda==cvmod.75$lambda.1se)]
+CV.1.ERROR=cvmod.1$cvm[which(cvmod.1$lambda==cvmod.1$lambda.1se)]
+
+MOD.RESULT=tibble(alpha=c(0,0.25,0.5,0.75,1),
+                  lambda=c(cvmod.0$lambda.min,cvmod.25$lambda.min,
+                           cvmod.5$lambda.min,cvmod.75$lambda.min,
+                           cvmod.1$lambda.min),
+                  CV.Error=c(CV.0.ERROR,CV.25.ERROR,CV.5.ERROR,
+                             CV.75.ERROR,CV.1.ERROR))
+print(MOD.RESULT)
+```
+
+```{r}
+best.alpha=MOD.RESULT$alpha[which.min(MOD.RESULT$CV.Error)]
+best.lambda=MOD.RESULT$lambda[which.min(MOD.RESULT$CV.Error)]
+
+best.mod=glmnet(y=y,x=as.matrix(X),nlambda=1,lambda=best.lambda,alpha=best.alpha)
+best.coef=as.tibble(as.matrix(coef(best.mod)))
+best.coef2=best.coef %>% 
+              mutate(Parameter=c("Int",var.names)) %>%
+              rename(Estimate=s0) %>%
+              dplyr::select(Parameter,Estimate)
+nonzero.best.coef=best.coef2 %>%
+                    filter(Estimate!=0)
+print(nonzero.best.coef,n=1e3)
+
+TB2020play.2$exitvelo.hat=predict(best.mod,newx=as.matrix(X))
+
+ggplot(TB2020play.2) +
+  geom_point(aes(x=launch_speed,y=exitvelo.hat),color="lightskyblue2") +
+  geom_abline(a=0,b=1,linetype="dashed") +
+  theme_minimal() +
+  ylab("Predicted Exit Velocity") +
+  xlab("Actual Exit Velocity")
+
+ggplot(TB2020play.2) +
+  geom_histogram(aes(x=launch_speed-exitvelo.hat),fill="lightskyblue2") +
+  theme_minimal() +
+  xlab("Residuals") +
+  ylab("Frequency")
+
+
+# residuals not very normally distributed & best model only includes zone, which can't be good for prediction stepwise regression model is better than this
+```
+
+
+```{r}
+library(kableExtra)
+kable(nonzero.best.coef) %>% kable_styling('condensed')
+```
+
+```{r}
+#write.csv(TB2020, file="TBRaysPitchers2020.csv")
+```
+
